@@ -141,8 +141,8 @@ def show_admin_panel():
         admin_pass = st.text_input("店長用パスワードを入力", type="password")
         if admin_pass == ADMIN_PASSWORD:
             st.write("---")
-            st.markdown("#### 📥 シフトデータのダウンロード")
-            st.write("スプレッドシートの最新データを、見やすく色付けされたExcelファイルとして保存します。")
+            st.markdown("#### シフトデータのダウンロード")
+            st.write("スプレッドシートの最新データをExcelファイルとして保存します。")
             
             if st.button("最新のExcelを作成する", use_container_width=True):
                 with st.spinner("クラウドからデータを取得＆Excelを装飾中..."):
@@ -154,7 +154,7 @@ def show_admin_panel():
                                 df_dl = pd.DataFrame(raw_data[1:], columns=raw_data[0])
                                 df_dl.columns = df_dl.columns.str.strip()
                                 
-                                # 🌟【改善③】部門順 ＆ 従業員コード順に綺麗に並び替え！
+                                # 部門順 ＆ 従業員コード順に並び替え
                                 if "部門" in df_dl.columns and "従業員コード" in df_dl.columns:
                                     # 部門を独自の順番で並べ替えるための設定
                                     dept_order = {dept: i for i, dept in enumerate(DEPARTMENTS) if dept != "選択してください"}
@@ -162,7 +162,7 @@ def show_admin_panel():
                                     df_dl["_code_num"] = pd.to_numeric(df_dl["従業員コード"], errors="coerce").fillna(999999)
                                     df_dl = df_dl.sort_values(["_sort_key", "_code_num"]).drop(columns=["_sort_key", "_code_num"])
 
-                                # 🌟 空中でExcelを作成 ＆ デザイン装飾！
+                                # 空中でExcelを作成 ＆ デザイン装飾！
                                 output = io.BytesIO()
                                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                                     sheet_name = f'{TARGET_MONTH}月シフト提出'
@@ -171,7 +171,7 @@ def show_admin_panel():
                                     # ここから openpyxl を使った自動デザイン装飾
                                     ws = writer.sheets[sheet_name]
                                     
-                                    # 🌟【改善②】左から5列目（希望出勤時間の右）＆2行目をスクロール固定！
+                                    # 左から5列目（希望出勤時間の右）2行目をスクロール固定
                                     ws.freeze_panes = "F2"
                                     
                                     # 色・罫線・フォントの準備
@@ -202,21 +202,20 @@ def show_admin_panel():
                                                 cell.font = font_header
                                                 cell.alignment = Alignment(horizontal="center", vertical="center")
                                             else:
-                                                # 🌟【改善①】データ行：土日・「休」の自動色付け
+                                                # データ行：フォントと中央揃えの基本設定
                                                 cell.font = font_normal
                                                 cell.alignment = Alignment(horizontal="center", vertical="center")
                                                 
-                                                # 土日の背景色
-                                                if "土" in col_name:
+                                                # 🌟【修正】土日を正確に判定して色付けする（「月〜金」の曜日を巻き込まないようにする）
+                                                if "（土）" in col_name:
                                                     cell.fill = fill_sat
-                                                elif "日" in col_name:
+                                                elif "（日）" in col_name:
                                                     cell.fill = fill_sun
                                                     
                                                 # 「休」の文字が入っていたら赤字にする
                                                 if cell.value and "休" in str(cell.value):
                                                     cell.font = font_off
                                     
-                                    # 🌟【改善④】列幅を見やすく自動調整
                                     for col in ws.columns:
                                         max_len = max(len(str(cell.value or "")) for cell in col)
                                         col_letter = get_column_letter(col[0].column)
@@ -225,7 +224,7 @@ def show_admin_panel():
                                 excel_data = output.getvalue()
                                 st.success("✅ デザイン装飾済みのExcel準備完了！")
                                 st.download_button(
-                                    label="📊 見やすいExcelファイル（.xlsx）を保存",
+                                    label="Excelファイル（.xlsx）を保存",
                                     data=excel_data,
                                     file_name=EXCEL_REQUESTS,
                                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
