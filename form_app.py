@@ -6,7 +6,9 @@ import calendar
 import unicodedata
 from filelock import FileLock
 import requests
-import io  # 空中でExcelを作るための部品
+import io
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 # ==========================================
 # ⚙️ 1. 設定値（定数）の定義
@@ -134,29 +136,96 @@ def generate_styled_calendar(day_labels, shift_requests):
     return df.style.apply(style_cells, axis=None)
 
 def show_admin_panel():
-    """右上の店長用確認パネル（Excelダウンロード機能 ＆ 提出状況一覧）"""
+    """右上の店長用確認パネル（神Excel化ダウンロード機能 ＆ 未提出チェック）"""
     with st.popover("店長専用メニュー", use_container_width=True):
         admin_pass = st.text_input("店長用パスワードを入力", type="password")
         if admin_pass == ADMIN_PASSWORD:
             st.write("---")
-            st.markdown("#### シフトデータのダウンロード")
-            st.write("スプレッドシートの最新データをExcelファイルとして保存します。")
+            st.markdown("#### 📥 シフトデータのダウンロード")
+            st.write("スプレッドシートの最新データを、見やすく色付けされたExcelファイルとして保存します。")
             
             if st.button("最新のExcelを作成する", use_container_width=True):
-                with st.spinner("クラウドからデータを取得中..."):
+                with st.spinner("クラウドからデータを取得＆Excelを装飾中..."):
                     try:
                         response = requests.get(f"{GAS_URL}?type=shift&month={TARGET_MONTH}", timeout=15)
                         if response.status_code == 200:
                             raw_data = response.json()
                             if len(raw_data) > 1:
                                 df_dl = pd.DataFrame(raw_data[1:], columns=raw_data[0])
+                                df_dl.columns = df_dl.columns.str.strip()
+                                
+                                # 🌟【改善③】部門順 ＆ 従業員コード順に綺麗に並び替え！
+                                if "部門" in df_dl.columns and "従業員コード" in df_dl.columns:
+                                    # 部門を独自の順番で並べ替えるための設定
+                                    dept_order = {dept: i for i, dept in enumerate(DEPARTMENTS) if dept != "選択してください"}
+                                    df_dl["_sort_key"] = df_dl["部門"].map(lambda x: dept_order.get(x, 99))
+                                    df_dl["_code_num"] = pd.to_numeric(df_dl["従業員コード"], errors="coerce").fillna(999999)
+                                    df_dl = df_dl.sort_values(["_sort_key", "_code_num"]).drop(columns=["_sort_key", "_code_num"])
+
+                                # 🌟 空中でExcelを作成 ＆ デザイン装飾！
                                 output = io.BytesIO()
                                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                                    df_dl.to_excel(writer, index=False, sheet_name=f'{TARGET_MONTH}月シフト提出')
+                                    sheet_name = f'{TARGET_MONTH}月シフト提出'
+                                    df_dl.to_excel(writer, index=False, sheet_name=sheet_name)
+                                    
+                                    # ここから openpyxl を使った自動デザイン装飾
+                                    ws = writer.sheets[sheet_name]
+                                    
+                                    # 🌟【改善②】左から5列目（希望出勤時間の右）＆2行目をスクロール固定！
+                                    ws.freeze_panes = "F2"
+                                    
+                                    # 色・罫線・フォントの準備
+                                    fill_header = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid") # グレー
+                                    fill_sat = PatternFill(start_color="E6F2FF", end_color="E6F2FF", fill_type="solid")    # 薄い青
+                                    fill_sun = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")    # 薄い赤
+                                    
+                                    font_header = Font(name="メイリオ", size=10, bold=True)
+                                    font_normal = Font(name="メイリオ", size=10)
+                                    font_off = Font(name="メイリオ", size=10, bold=True, color="FF0000") # 赤字・太字
+                                    
+                                    border_thin = Border(
+                                        left=Side(style='thin', color='D9D9D9'),
+                                        right=Side(style='thin', color='D9D9D9'),
+                                        top=Side(style='thin', color='D9D9D9'),
+                                        bottom=Side(style='thin', color='D9D9D9')
+                                    )
+                                    
+                                    # 全セルのスタイリング＆色付け
+                                    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+                                        for cell in row:
+                                            cell.border = border_thin
+                                            col_name = str(ws.cell(row=1, column=cell.column).value or "")
+                                            
+                                            if cell.row == 1:
+                                                # 見出し行のデザイン
+                                                cell.fill = fill_header
+                                                cell.font = font_header
+                                                cell.alignment = Alignment(horizontal="center", vertical="center")
+                                            else:
+                                                # 🌟【改善①】データ行：土日・「休」の自動色付け
+                                                cell.font = font_normal
+                                                cell.alignment = Alignment(horizontal="center", vertical="center")
+                                                
+                                                # 土日の背景色
+                                                if "土" in col_name:
+                                                    cell.fill = fill_sat
+                                                elif "日" in col_name:
+                                                    cell.fill = fill_sun
+                                                    
+                                                # 「休」の文字が入っていたら赤字にする
+                                                if cell.value and "休" in str(cell.value):
+                                                    cell.font = font_off
+                                    
+                                    # 🌟【改善④】列幅を見やすく自動調整
+                                    for col in ws.columns:
+                                        max_len = max(len(str(cell.value or "")) for cell in col)
+                                        col_letter = get_column_letter(col[0].column)
+                                        ws.column_dimensions[col_letter].width = max(max_len * 2, 12)
+
                                 excel_data = output.getvalue()
-                                st.success("✅ 準備完了！下のボタンから保存してください。")
+                                st.success("✅ デザイン装飾済みのExcel準備完了！")
                                 st.download_button(
-                                    label="Excelファイル（.xlsx）を保存",
+                                    label="📊 見やすいExcelファイル（.xlsx）を保存",
                                     data=excel_data,
                                     file_name=EXCEL_REQUESTS,
                                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -171,7 +240,7 @@ def show_admin_panel():
                         st.error(f"通信エラーが発生しました: {e}")
 
             st.write("---")
-            st.markdown("#### 提出状況一覧（未提出チェック）")
+            st.markdown("#### 👤 提出状況一覧（未提出チェック）")
             
             with st.spinner("名簿と提出状況を照合中..."):
                 try:
