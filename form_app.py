@@ -22,7 +22,7 @@ CSV_REQUESTS = f"【プログラム用】{TARGET_MONTH}月シフト提出状況.
 EXCEL_REQUESTS = f"【店長確認用】{TARGET_MONTH}月シフト提出状況.xlsx"
 LOCK_FILE = f"{TARGET_MONTH}月シフト提出状況.lock"
 
-DEPARTMENTS = ["選択してください", "家電", "季節AV", "情報", "通信"]
+DEPARTMENTS = ["選択してください", "季節AV", "家電", "情報", "通信"]
 ADMIN_PASSWORD = "password"
 
 # GoogleスプレッドシートのScriptsたち
@@ -141,8 +141,8 @@ def show_admin_panel():
         admin_pass = st.text_input("店長用パスワードを入力", type="password")
         if admin_pass == ADMIN_PASSWORD:
             st.write("---")
-            st.markdown("#### シフトデータのダウンロード")
-            st.write("スプレッドシートの最新データをExcelファイルとして保存します。")
+            st.markdown("#### 📥 シフトデータのダウンロード")
+            st.write("スプレッドシートの最新データを、見やすく色付けされたExcelファイルとして保存します。")
             
             if st.button("最新のExcelを作成する", use_container_width=True):
                 with st.spinner("クラウドからデータを取得＆Excelを装飾中..."):
@@ -154,9 +154,13 @@ def show_admin_panel():
                                 df_dl = pd.DataFrame(raw_data[1:], columns=raw_data[0])
                                 df_dl.columns = df_dl.columns.str.strip()
                                 
-                                # 部門順 ＆ 従業員コード順に並び替え
+                                # 🌟【追加】不要な列（対象月、提出日時）をExcelの表から除外する！
+                                drop_cols = [c for c in ["対象月", "提出日時"] if c in df_dl.columns]
+                                if drop_cols:
+                                    df_dl = df_dl.drop(columns=drop_cols)
+                                
+                                # 部門順 ＆ 従業員コード順に綺麗に並び替え
                                 if "部門" in df_dl.columns and "従業員コード" in df_dl.columns:
-                                    # 部門を独自の順番で並べ替えるための設定
                                     dept_order = {dept: i for i, dept in enumerate(DEPARTMENTS) if dept != "選択してください"}
                                     df_dl["_sort_key"] = df_dl["部門"].map(lambda x: dept_order.get(x, 99))
                                     df_dl["_code_num"] = pd.to_numeric(df_dl["従業員コード"], errors="coerce").fillna(999999)
@@ -171,8 +175,8 @@ def show_admin_panel():
                                     # ここから openpyxl を使った自動デザイン装飾
                                     ws = writer.sheets[sheet_name]
                                     
-                                    # 左から5列目（希望出勤時間の右）2行目をスクロール固定
-                                    ws.freeze_panes = "F2"
+                                    # 🌟【調整】2列消えてスッキリした分、左4列（従業員コード〜希望出勤時間）の右隣＝「E2」を固定する！
+                                    ws.freeze_panes = "E2"
                                     
                                     # 色・罫線・フォントの準備
                                     fill_header = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid") # グレー
@@ -206,7 +210,7 @@ def show_admin_panel():
                                                 cell.font = font_normal
                                                 cell.alignment = Alignment(horizontal="center", vertical="center")
                                                 
-                                                # 🌟【修正】土日を正確に判定して色付けする（「月〜金」の曜日を巻き込まないようにする）
+                                                # 🌟【先ほどの修正】土曜（薄青）と日曜（薄赤）を確実に塗り分ける！
                                                 if "（土）" in col_name:
                                                     cell.fill = fill_sat
                                                 elif "（日）" in col_name:
@@ -216,6 +220,7 @@ def show_admin_panel():
                                                 if cell.value and "休" in str(cell.value):
                                                     cell.font = font_off
                                     
+                                    # 列幅を見やすく自動調整
                                     for col in ws.columns:
                                         max_len = max(len(str(cell.value or "")) for cell in col)
                                         col_letter = get_column_letter(col[0].column)
@@ -224,7 +229,7 @@ def show_admin_panel():
                                 excel_data = output.getvalue()
                                 st.success("✅ デザイン装飾済みのExcel準備完了！")
                                 st.download_button(
-                                    label="Excelファイル（.xlsx）を保存",
+                                    label="📊 見やすいExcelファイル（.xlsx）を保存",
                                     data=excel_data,
                                     file_name=EXCEL_REQUESTS,
                                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
