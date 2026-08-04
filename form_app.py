@@ -141,7 +141,7 @@ def show_admin_panel():
         admin_pass = st.text_input("店長用パスワードを入力", type="password")
         if admin_pass == ADMIN_PASSWORD:
             st.write("---")
-            st.markdown("#### 📥 シフトデータのダウンロード")
+            st.markdown("#### シフトデータのダウンロード")
             st.write("スプレッドシートの最新データを、見やすく色付けされたExcelファイルとして保存します。")
             
             if st.button("最新のExcelを作成する", use_container_width=True):
