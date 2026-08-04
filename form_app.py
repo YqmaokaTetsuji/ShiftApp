@@ -175,7 +175,7 @@ def show_admin_panel():
                                     # ここから openpyxl を使った自動デザイン装飾
                                     ws = writer.sheets[sheet_name]
                                     
-                                    # 🌟【調整】2列消えてスッキリした分、左4列（従業員コード〜希望出勤時間）の右隣＝「E2」を固定する！
+                                    #左4列（従業員コード〜希望出勤時間を固定す
                                     ws.freeze_panes = "E2"
                                     
                                     # 色・罫線・フォントの準備
@@ -210,7 +210,7 @@ def show_admin_panel():
                                                 cell.font = font_normal
                                                 cell.alignment = Alignment(horizontal="center", vertical="center")
                                                 
-                                                # 🌟【先ほどの修正】土曜（薄青）と日曜（薄赤）を確実に塗り分ける！
+                                                # 土曜（薄青）と日曜（薄赤）塗り分ける！
                                                 if "（土）" in col_name:
                                                     cell.fill = fill_sat
                                                 elif "（日）" in col_name:
@@ -227,9 +227,9 @@ def show_admin_panel():
                                         ws.column_dimensions[col_letter].width = max(max_len * 2, 12)
 
                                 excel_data = output.getvalue()
-                                st.success("✅ デザイン装飾済みのExcel準備完了！")
+                                st.success("✅ Excel準備完了！")
                                 st.download_button(
-                                    label="📊 見やすいExcelファイル（.xlsx）を保存",
+                                    label="Excelファイル（.xlsx）を保存",
                                     data=excel_data,
                                     file_name=EXCEL_REQUESTS,
                                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
