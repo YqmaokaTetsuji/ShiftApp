@@ -26,7 +26,7 @@ LOCK_FILE = f"{TARGET_MONTH}月シフト提出状況.lock"
 DEPARTMENTS = ["選択してください", "季節AV", "家電", "情報", "通信"]
 
 # パスワードの指定
-ADMIN_PASSWORD = "password"
+ADMIN_PASSWORD = st.secrets["admin_password"]
 
 # GoogleスプレッドシートのScriptsたち
 GAS_URL = "https://script.google.com/macros/s/AKfycbx20gcPFY7CKjGRjNMNHI9zNgwzmC_i8u1Wsw1r2BrpTtYUmB06ejgWFGKtLbJaTlPkGw/exec"
