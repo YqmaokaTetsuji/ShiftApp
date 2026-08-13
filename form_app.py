@@ -11,18 +11,21 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 # ==========================================
-# ⚙️ 1. 設定値（定数）の定義
+# 設定値の定義
 # ==========================================
 today = datetime.date.today()
 TARGET_YEAR = today.year + 1 if today.month == 12 else today.year
 TARGET_MONTH = 1 if today.month == 12 else today.month + 1
 
-# ローカルでは保存用、クラウド上ではバックアップ上
+# バックアップ用のファイル指定
 CSV_REQUESTS = f"【プログラム用】{TARGET_MONTH}月シフト提出状況.csv"
 EXCEL_REQUESTS = f"【店長確認用】{TARGET_MONTH}月シフト提出状況.xlsx"
 LOCK_FILE = f"{TARGET_MONTH}月シフト提出状況.lock"
 
+# 部門の指定
 DEPARTMENTS = ["選択してください", "季節AV", "家電", "情報", "通信"]
+
+# パスワードの指定
 ADMIN_PASSWORD = "password"
 
 # GoogleスプレッドシートのScriptsたち
@@ -30,11 +33,19 @@ GAS_URL = "https://script.google.com/macros/s/AKfycbx20gcPFY7CKjGRjNMNHI9zNgwzmC
 
 st.set_page_config(page_title="シフト希望提出フォーム", layout="wide")
 
+hide_streamlit_style = """
+<style>
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+footer {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 # ==========================================
-# 2. 関数の定義
+# 関数の定義
 # ==========================================
 def init_session_state():
-    """セッションステートの初期化"""
+    """状態の初期化"""
     if "confirm_mode" not in st.session_state:
         st.session_state.confirm_mode = False
     if "is_submitted" not in st.session_state:
@@ -44,8 +55,8 @@ def init_session_state():
     if "is_processing" not in st.session_state:
         st.session_state.is_processing = False
 
+# 来月の日にちとその曜日を取得する関数
 def get_month_days():
-    """来月の日数と日付ラベルのリストを取得する"""
     _, num_days = calendar.monthrange(TARGET_YEAR, TARGET_MONTH)
     weekdays_ja = ["月", "火", "水", "木", "金", "土", "日"]
     
@@ -56,8 +67,8 @@ def get_month_days():
         
     return num_days, day_labels
 
+# スプシにデータを送信
 def save_shift_data(emp_code, name, department, target_days, shift_requests):
-    """シフトデータを保存する（Googleスプレッドシートへ自動送信）"""
     safe_emp_code = unicodedata.normalize('NFKC', emp_code).strip()
     safe_name = name.strip()
     
@@ -72,7 +83,7 @@ def save_shift_data(emp_code, name, department, target_days, shift_requests):
     }
     data.update(shift_requests)
     
-    # 🌟 1. Googleスプレッドシート（GAS）へデータを送信
+    # Googleスプレッドシートへデータを送信
     try:
         response = requests.post(GAS_URL, json=data, timeout=10)
         if response.status_code != 200 or response.json().get("status") != "success":
@@ -80,7 +91,7 @@ def save_shift_data(emp_code, name, department, target_days, shift_requests):
     except Exception:
         return "gas_error"
     
-    # 念のためサーバーのローカル環境にもバックアップを残す
+    # 念のためサーバーのローカル環境にもバックアップ（今は過去の遺産と化した）
     df_submit = pd.DataFrame([data])
     lock = FileLock(LOCK_FILE)
     with lock:
@@ -101,8 +112,8 @@ def save_shift_data(emp_code, name, department, target_days, shift_requests):
             
     return "success"
 
+# プレビュー用のカレンダーを作成、表示
 def generate_styled_calendar(day_labels, shift_requests):
-    """色付きのカレンダー表を作成する"""
     calendar.setfirstweekday(calendar.SUNDAY)
     cal_matrix = calendar.monthcalendar(TARGET_YEAR, TARGET_MONTH)
     cal_data = []
@@ -120,7 +131,8 @@ def generate_styled_calendar(day_labels, shift_requests):
         cal_data.append(week_data)
         
     df = pd.DataFrame(cal_data, columns=["日", "月", "火", "水", "木", "金", "土"])
-    
+
+    # 日によってセルの設定を変えるよ
     def style_cells(data):
         styles = pd.DataFrame("", index=data.index, columns=data.columns)
         for row in data.index:
@@ -135,8 +147,8 @@ def generate_styled_calendar(day_labels, shift_requests):
 
     return df.style.apply(style_cells, axis=None)
 
+# 店長用のメニューを表示（ここ冗長すぎるから絶対にリファクタリンぐ最優先！！！！！！！！！！！！！！！！！！！！！！！！！！！！！）
 def show_admin_panel():
-    """右上の店長用確認パネル（神Excel化ダウンロード機能 ＆ 未提出チェック）"""
     with st.popover("店長専用メニュー", use_container_width=True):
         admin_pass = st.text_input("店長用パスワードを入力", type="password")
         if admin_pass == ADMIN_PASSWORD:
@@ -154,19 +166,19 @@ def show_admin_panel():
                                 df_dl = pd.DataFrame(raw_data[1:], columns=raw_data[0])
                                 df_dl.columns = df_dl.columns.str.strip()
                                 
-                                # 🌟【追加】不要な列（対象月、提出日時）をExcelの表から除外する！
+                                # 不要な列をExcelの表から除外する
                                 drop_cols = [c for c in ["対象月", "提出日時"] if c in df_dl.columns]
                                 if drop_cols:
                                     df_dl = df_dl.drop(columns=drop_cols)
                                 
-                                # 部門順 ＆ 従業員コード順に綺麗に並び替え
+                                # 部門順 従業員コード順に並び替え
                                 if "部門" in df_dl.columns and "従業員コード" in df_dl.columns:
                                     dept_order = {dept: i for i, dept in enumerate(DEPARTMENTS) if dept != "選択してください"}
                                     df_dl["_sort_key"] = df_dl["部門"].map(lambda x: dept_order.get(x, 99))
                                     df_dl["_code_num"] = pd.to_numeric(df_dl["従業員コード"], errors="coerce").fillna(999999)
                                     df_dl = df_dl.sort_values(["_sort_key", "_code_num"]).drop(columns=["_sort_key", "_code_num"])
 
-                                # 空中でExcelを作成 ＆ デザイン装飾！
+                                # 空中でExcelを作成 デザイン装飾
                                 output = io.BytesIO()
                                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                                     sheet_name = f'{TARGET_MONTH}月シフト提出'
@@ -175,7 +187,7 @@ def show_admin_panel():
                                     # ここから openpyxl を使った自動デザイン装飾
                                     ws = writer.sheets[sheet_name]
                                     
-                                    #左4列（従業員コード〜希望出勤時間を固定す
+                                    #左4列（従業員コード〜希望出勤時間を固定
                                     ws.freeze_panes = "E2"
                                     
                                     # 色・罫線・フォントの準備
@@ -210,7 +222,7 @@ def show_admin_panel():
                                                 cell.font = font_normal
                                                 cell.alignment = Alignment(horizontal="center", vertical="center")
                                                 
-                                                # 土曜（薄青）と日曜（薄赤）塗り分ける！
+                                                # 土曜と日曜塗り分ける
                                                 if "（土）" in col_name:
                                                     cell.fill = fill_sat
                                                 elif "（日）" in col_name:
@@ -245,7 +257,8 @@ def show_admin_panel():
 
             st.write("---")
             st.markdown("#### 👤 提出状況一覧（未提出チェック）")
-            
+
+            # 現在の提出状況を確認する
             with st.spinner("名簿と提出状況を照合中..."):
                 try:
                     res_member = requests.get(f"{GAS_URL}?type=member", timeout=15)
@@ -289,13 +302,13 @@ def show_admin_panel():
                     st.error(f"読み込みエラー: {e}")
 
 # ==========================================
-# 3. メインの画面描画
+# メインの画面描画
 # ==========================================
 init_session_state()
 input_disabled = st.session_state.confirm_mode or st.session_state.is_submitted
 num_days, day_labels = get_month_days()
 
-# --- タイトル ＆ 管理者パネル ---
+# --- タイトル 管理者パネル ---
 col_title, col_admin = st.columns([4, 1])
 with col_title:
     st.markdown(f"### {TARGET_YEAR}年{TARGET_MONTH}月分 シフト希望提出フォーム")
@@ -341,7 +354,7 @@ with col_right:
 
 st.divider()
 
-# --- プレビュー ＆ ボタンエリア ---
+# --- プレビュー　ボタンエリア ---
 if st.session_state.is_submitted:
     st.success(f"{name}さん、シフトの提出が完了しました。")
     st.info("※修正が必要な場合は店長または箭内へ連絡してください。")
@@ -360,7 +373,7 @@ elif st.session_state.confirm_mode:
             st.rerun()
     with col_btn2:
         if st.button("この内容で確定・提出する", type="primary", use_container_width=True):
-            # ボタンが押されたらフラグを立てて即座に再描画（連打防止）
+            # 連打防止
             st.session_state.is_processing = True
             st.rerun()
 
