@@ -29,7 +29,7 @@ DEPARTMENTS = ["選択してください", "季節AV", "家電", "情報", "通�
 ADMIN_PASSWORD = st.secrets["admin_password"]
 
 # GoogleスプレッドシートのScriptsたち
-GAS_URL = "https://script.google.com/macros/s/AKfycbx20gcPFY7CKjGRjNMNHI9zNgwzmC_i8u1Wsw1r2BrpTtYUmB06ejgWFGKtLbJaTlPkGw/exec"
+GAS_URL = st.secrets["gas_url"]
 
 st.set_page_config(page_title="シフト希望提出フォーム", layout="wide")
 
