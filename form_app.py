@@ -29,10 +29,10 @@ LOCK_FILE = f'{TARGET_MONTH}月シフト提出状況.lock'
 DEPARTMENTS = ['選択してください', '季節AV', '家電', '情報', '通信']
 
 # パスワードの指定
-ADMIN_PASSWORD = "st.secrets['admin_password']"
+ADMIN_PASSWORD = st.secrets['admin_password']
 
 # GoogleスプレッドシートのScriptsたち
-GAS_URL = "st.secrets['gas_url']"
+GAS_URL = st.secrets['gas_url']
 
 hide_streamlit_style = '''
 <style>
