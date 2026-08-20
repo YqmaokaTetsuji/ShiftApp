@@ -30,7 +30,6 @@ ADMIN_PASSWORD = st.secrets['admin_password']
 
 # GoogleスプレッドシートのScriptsたち
 GAS_URL = st.secrets['gas_url']
-st.set_page_config(page_title='シフト希望提出フォーム', layout='wide')
 
 hide_streamlit_style = '''
 <style>
@@ -67,7 +66,7 @@ def get_month_days():
     return num_days, day_labels
 
 # スプシにデータを送信
-def save_shift_data(emp_code, name, department, target_days, shift_requests):
+def save_shift_data(emp_code, name, department, target_days, shift_requests, remarks):
     safe_emp_code = unicodedata.normalize('NFKC', emp_code).strip()
     safe_name = name.strip()
     
@@ -81,6 +80,8 @@ def save_shift_data(emp_code, name, department, target_days, shift_requests):
         '希望出勤時間': target_days
     }
     data.update(shift_requests)
+
+    data['備考'] = remarks.strip()
     
     # Googleスプレッドシートへデータを送信
     try:
@@ -351,6 +352,7 @@ with col_left:
     emp_code = st.text_input('2. 従業員コード（数字）', key='input_code', disabled=input_disabled)
     department = st.selectbox('3. 部門を選択', DEPARTMENTS, key='input_dept', disabled=input_disabled)
     target_days = st.number_input('4. 希望出勤時間（希望がない場合は0を入力してください）', min_value=0, max_value=120, value=0, step=1, key='input_days', disabled=input_disabled)
+    remarks = st.text_area('5. 備考（自由記述）', key='input_remarks', disabled=input_disabled, placeholder='テスト期間や、時間指定の補足などがあれば記入してください。')
 
 with col_right:
     st.subheader('日ごとの希望')
@@ -391,6 +393,10 @@ elif st.session_state.confirm_mode:
     st.warning('以下の内容で確定してよろしいですか？')
     st.markdown('#### シフト希望プレビュー')
     st.table(generate_styled_calendar(day_labels, shift_requests))
+
+    if remarks:
+        st.markdown('**【備考】**')
+        st.write(remarks)
     
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
@@ -406,7 +412,7 @@ elif st.session_state.confirm_mode:
 # 連打対策
 if st.session_state.get('is_processing', False) and not st.session_state.is_submitted:
     with st.spinner('クラウドにシフトを送信しています...'):
-        result = save_shift_data(emp_code, name, department, target_days, shift_requests)
+        result = save_shift_data(emp_code, name, department, target_days, shift_requests, remarks)
     
     if result == 'gas_error':
         st.error('【通信エラー】Googleスプレッドシートへの送信に失敗しました。時間をおいてもう一度お試しいただくか、管理者へ連絡してください。')
