@@ -13,7 +13,10 @@ st.set_page_config(page_title='シフト希望提出フォーム', layout='wide'
 # ==========================================
 # 設定値の定義
 # ==========================================
-today = datetime.date.today()
+JST = datetime.timezone(datetime.timedelta(hours=+9), 'JST')
+now_jst = datetime.datetime.now(JST)
+today = now_jst.date()
+
 TARGET_YEAR = today.year + 1 if today.month == 12 else today.year
 TARGET_MONTH = 1 if today.month == 12 else today.month + 1
 
@@ -26,10 +29,10 @@ LOCK_FILE = f'{TARGET_MONTH}月シフト提出状況.lock'
 DEPARTMENTS = ['選択してください', '季節AV', '家電', '情報', '通信']
 
 # パスワードの指定
-ADMIN_PASSWORD = st.secrets['admin_password']
+ADMIN_PASSWORD = "st.secrets['admin_password']"
 
 # GoogleスプレッドシートのScriptsたち
-GAS_URL = st.secrets['gas_url']
+GAS_URL = "st.secrets['gas_url']"
 
 hide_streamlit_style = '''
 <style>
@@ -53,6 +56,40 @@ def init_session_state():
     if 'is_processing' not in st.session_state:
         st.session_state.is_processing = False
 
+@st.dialog('シフトの一括入力')
+def bulk_input_dialog(day_labels):
+    st.write('一括で入力したい曜日や日付を選択してください。')
+    
+    weekdays = ['月', '火', '水', '木', '金', '土', '日']
+    selected_dows = st.multiselect('1．曜日でまとめて選択', weekdays, placeholder='（例：月、水、金）')
+    selected_dates = st.multiselect('2．特定の日付を追加で選択', day_labels, placeholder='（例：15日、20日）')
+    
+    st.divider()
+    
+    shift_type = st.radio('適用するシフトを選択', ['希望なし', '休', '早', '遅', '時間指定', '有給'], horizontal=True)
+    specific_time = ''
+    if shift_type == '時間指定':
+        specific_time = st.text_input('希望時間を入力（例：11-19, 早-15）', key='bulk_time_input')
+        
+    if st.button('この内容で一括反映する', type='primary', use_container_width=True):
+        # 選択された日付と曜日を合体させる
+        target_labels = set(selected_dates)
+        for label in day_labels:
+            for dow in selected_dows:
+                if f'（{dow}）' in label:
+                    target_labels.add(label)
+                    
+        if not target_labels:
+            st.error('対象の日付または曜日を1つ以上選択してください。')
+        else:
+            # メイン画面の入力欄（セッションステート）を直接書き換える
+            for label in target_labels:
+                st.session_state[f'radio_{label}'] = shift_type
+                if shift_type == '時間指定':
+                    st.session_state[f'time_{label}'] = specific_time
+            # 画面を更新してダイアログを閉じる
+            st.rerun()
+
 # 来月の日にちとその曜日を取得する関数
 def get_month_days():
     _, num_days = calendar.monthrange(TARGET_YEAR, TARGET_MONTH)
@@ -73,7 +110,7 @@ def save_shift_data(emp_code, name, department, target_days, shift_requests, rem
     # 送信用のデータを作成
     data = {
         '対象月': f'{TARGET_MONTH}月',
-        '提出日時': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        '提出日時': datetime.datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S'),
         '従業員コード': safe_emp_code,
         '名前': safe_name, 
         '部門': department,
@@ -333,6 +370,13 @@ init_session_state()
 input_disabled = st.session_state.confirm_mode or st.session_state.is_submitted
 num_days, day_labels = get_month_days()
 
+# あらかじめ全日程の変数を希望なしとして作成（一括入力のため）
+for label in day_labels:
+    if f'radio_{label}' not in st.session_state:
+        st.session_state[f'radio_{label}'] = '希望なし'
+    if f'time_{label}' not in st.session_state:
+        st.session_state[f'time_{label}'] = ''
+
 # --- タイトル 管理者パネル ---
 col_title, col_admin = st.columns([4, 1])
 with col_title:
@@ -343,19 +387,31 @@ with col_admin:
 
 st.divider()
 
+# メンテナンス期間中は表示しないようにする
+if 0 <= now_jst.hour < 4:
+    st.error('**現在システムメンテナンス中です**\n\n毎日 **00:00 〜 04:00** はメンテナンスのためご利用いただけません。\n恐れ入りますが、この時間を避けて再度アクセスしてください。')
+    st.stop()
+
 # --- 入力エリア ---
 col_left, col_right = st.columns([1, 2])
 
 with col_left:
     st.subheader('基本情報')
-    name = st.text_input('1. お名前', key='input_name', disabled=input_disabled)
+    name = st.text_input('1. お名前（フルネーム）', key='input_name', disabled=input_disabled)
     emp_code = st.text_input('2. 従業員コード（数字）', key='input_code', disabled=input_disabled)
     department = st.selectbox('3. 部門を選択', DEPARTMENTS, key='input_dept', disabled=input_disabled)
     target_days = st.number_input('4. 希望出勤時間（希望がない場合は0を入力してください）', min_value=0, max_value=120, value=0, step=1, key='input_days', disabled=input_disabled)
     remarks = st.text_area('5. 備考（自由記述）', key='input_remarks', disabled=input_disabled, placeholder='テスト期間や、時間指定の補足などがあれば記入してください。')
 
 with col_right:
-    st.subheader('日ごとの希望')
+    # 日ごとの希望と一括入力の2つの欄を作成
+    col_sub, col_btn = st.columns([2, 1])
+    with col_sub:
+        st.subheader('日ごとの希望')
+    with col_btn:
+        if st.button('一括入力する', use_container_width=True, disabled=input_disabled):
+            bulk_input_dialog(day_labels)
+
     tab_titles = ['1日〜7日', '8日〜14日', '15日〜21日', '22日〜28日']
     day_groups = [day_labels[0:7], day_labels[7:14], day_labels[14:21], day_labels[21:28]]
     if num_days > 28:
