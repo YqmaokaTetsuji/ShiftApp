@@ -9,7 +9,7 @@ import requests
 import io
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-
+st.set_page_config(page_title='シフト希望提出フォーム', layout='wide')
 # ==========================================
 # 設定値の定義
 # ==========================================
