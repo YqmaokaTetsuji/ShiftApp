@@ -1,0 +1,14 @@
+# シークレット（絶対にコミットしない）
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# 旧版がローカルに吐いていたバックアップ
+*.lock
+【プログラム用】*.csv
+【店長確認用】*.xlsx

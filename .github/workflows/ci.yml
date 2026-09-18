@@ -1,0 +1,31 @@
+name: CI
+
+# develop への push と main への PR でテストを回す。
+# ここが赤いまま本番へ出さないための門番。
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Streamlit Cloud 側の Python バージョンと揃えること
+          python-version: '3.12'
+          cache: pip
+
+      - name: 依存をインストール
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: pytest
+        run: python -m pytest -q

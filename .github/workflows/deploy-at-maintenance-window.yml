@@ -1,0 +1,65 @@
+name: メンテナンス枠で本番へ反映
+
+# Streamlit Cloud は main への push を検知して即アプリを再起動する。
+# 再起動すると入力中の利用者のセッションが飛ぶので、
+# アプリ側のメンテナンス枠（00:00〜04:00 JST）の中でだけ main を進める。
+on:
+  schedule:
+    # cron は UTC 指定。17:00 UTC = 翌 02:00 JST。
+    # GitHub の schedule は混雑時に数十分遅れることがあるが、
+    # メンテナンス枠の終わり（04:00 JST）まで2時間あるので収まる。
+    - cron: '0 17 * * *'
+  workflow_dispatch:  # 「今すぐ出したい」ときは手動実行
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: 依存をインストール
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: pytest
+        run: python -m pytest -q
+
+  merge:
+    needs: test  # テストが赤ければ本番へは出さない
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: develop を main へマージして反映
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin develop
+
+          if git diff --quiet HEAD origin/develop; then
+            echo "develop に新しい変更なし。デプロイをスキップします。"
+            exit 0
+          fi
+
+          git merge --no-ff origin/develop -m "deploy: develop -> main"
+          git push origin main
+          echo "main を更新しました。Streamlit Cloud が自動で再デプロイします。"
