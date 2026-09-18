@@ -20,7 +20,7 @@ SHIFT_CHOICES = ['希望なし', '休', '早', '遅', '時間指定', '有給']
 WEEKDAYS_JA = ['月', '火', '水', '木', '金', '土', '日']
 
 # メンテナンス時間帯（この時間はフォームを閉じる）
-MAINTENANCE_START_HOUR = 0
+MAINTENANCE_START_HOUR = 3
 MAINTENANCE_END_HOUR = 4
 
 # 希望出勤時間の入力レンジ
