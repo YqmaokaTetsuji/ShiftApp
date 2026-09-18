@@ -16,7 +16,7 @@ class GasError(Exception):
 
 
 def submit(payload: dict) -> None:
-    '''提出データを1件送信する。失敗時は GasError。'''
+    '''提出データを1件送信する。失敗時は GasErrorを返す'''
     url = get_settings().gas_url
     try:
         response = requests.post(url, json=payload, timeout=POST_TIMEOUT_SEC)
