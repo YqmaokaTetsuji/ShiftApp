@@ -4,7 +4,7 @@ Streamlit に依存しないので、将来 FastAPI などから呼び出すこ�
 '''
 import pandas as pd
 
-from core.config import DEPARTMENTS, DEPARTMENT_PLACEHOLDER
+from core.config import DEPARTMENTS, DEPARTMENT_PLACEHOLDER, get_store_settings
 from core.models import ShiftSubmission
 from services import gas_client
 from services.gas_client import GasError  # 呼び出し側の import を1箇所にまとめる
@@ -27,15 +27,22 @@ STATUS_PENDING = '未提出'
 MEMBER_REQUIRED_COLUMNS = ['従業員コード', '名前', '部門']
 
 
-def submit_shift(submission: ShiftSubmission, target_month: int) -> None:
-    '''シフト希望を1件提出する。失敗時は GasError。
+def _gas_url(store_code: str) -> str:
+    return get_store_settings(store_code).gas_url
+
+
+def submit_shift(submission: ShiftSubmission, target_month: int, store_code: str) -> None:
+    '''シフト希望を店舗のスプレッドシートへ1件提出する。失敗時は GasError。
 
     内容から決まる request_id を添えて送る。同じ内容が二重に届いた場合は
     GAS 側が 2 件目以降を捨てるので、連打やリトライで行が増えない。
+
+    店舗はペイロードに入れない。保存先のスプレッドシート自体が店舗ごとに
+    分かれているうえ、列を足すと既存シートの見出しとずれてしまうため。
     '''
     payload = submission.to_payload(target_month)
     payload['request_id'] = submission.request_id(target_month)
-    gas_client.submit(payload)
+    gas_client.submit(_gas_url(store_code), payload)
 
 
 def _rows_to_dataframe(rows: list) -> pd.DataFrame:
@@ -47,14 +54,14 @@ def _rows_to_dataframe(rows: list) -> pd.DataFrame:
     return df
 
 
-def fetch_shifts(target_month: int) -> pd.DataFrame:
-    '''対象月の提出済みシフトを取得する。未提出のみなら空の DataFrame。'''
-    return _rows_to_dataframe(gas_client.fetch_rows('shift', month=target_month))
+def fetch_shifts(target_month: int, store_code: str) -> pd.DataFrame:
+    '''店舗の対象月の提出済みシフトを取得する。未提出のみなら空の DataFrame。'''
+    return _rows_to_dataframe(gas_client.fetch_rows(_gas_url(store_code), 'shift', month=target_month))
 
 
-def fetch_members() -> pd.DataFrame:
-    '''名簿タブを取得する。'''
-    return _rows_to_dataframe(gas_client.fetch_rows('member'))
+def fetch_members(store_code: str) -> pd.DataFrame:
+    '''店舗の名簿タブを取得する。'''
+    return _rows_to_dataframe(gas_client.fetch_rows(_gas_url(store_code), 'member'))
 
 
 def _normalize_codes(series: pd.Series) -> pd.Series:

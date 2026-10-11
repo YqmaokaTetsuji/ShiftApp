@@ -27,25 +27,50 @@ def test_is_maintenance_time(hour, expected):
     assert config.is_maintenance_time(moment) is expected
 
 
-def test_get_settings_reads_env():
-    settings = config.get_settings()
-    assert settings.gas_url == 'https://example.test/exec'
-    assert settings.admin_password == 'test-pass'
+def test_stores_have_unique_codes():
+    codes = [store.code for store in config.STORES]
+    assert len(codes) == len(set(codes)) == 8
+    assert config.STORES_BY_CODE['246'].name == '練馬高野台駅前'
 
 
-def test_get_settings_raises_without_secret(monkeypatch):
-    '''環境変数も st.secrets も無いときは、起動時に気づけるよう例外にする。'''
+def test_get_store_settings_reads_env():
+    settings = config.get_store_settings('246')
+    assert settings.gas_url == 'https://example.test/246/exec'
+    assert settings.admin_password == 'test-pass-246'
+
+
+def test_get_store_settings_is_separate_per_store():
+    assert config.get_store_settings('116').gas_url != config.get_store_settings('246').gas_url
+
+
+def test_get_store_settings_reads_streamlit_secrets(monkeypatch):
     import streamlit as st
 
-    class _NoSecrets:
-        def __getitem__(self, key):
-            raise KeyError(key)
+    secrets = {'stores': {'176': {'gas_url': 'https://secret.test/176', 'admin_password': 'pw176'}}}
+    monkeypatch.setattr(st, 'secrets', secrets)
+    monkeypatch.delenv('GAS_URL_176')
+    monkeypatch.delenv('ADMIN_PASSWORD_176')
+    config.get_store_settings.cache_clear()
+
+    settings = config.get_store_settings('176')
+    assert settings.gas_url == 'https://secret.test/176'
+    assert settings.admin_password == 'pw176'
+
+
+def test_get_store_settings_rejects_unknown_store():
+    with pytest.raises(RuntimeError, match='登録されていません'):
+        config.get_store_settings('999')
+
+
+def test_get_store_settings_raises_without_secret(monkeypatch):
+    '''環境変数も st.secrets も無いときは、入力前に気づけるよう例外にする。'''
+    import streamlit as st
 
     # ローカルに .streamlit/secrets.toml があっても結果が変わらないようにする
-    monkeypatch.setattr(st, 'secrets', _NoSecrets())
-    monkeypatch.delenv('GAS_URL', raising=False)
-    monkeypatch.delenv('ADMIN_PASSWORD', raising=False)
-    config.get_settings.cache_clear()
+    monkeypatch.setattr(st, 'secrets', {})
+    monkeypatch.delenv('GAS_URL_116')
+    monkeypatch.delenv('ADMIN_PASSWORD_116')
+    config.get_store_settings.cache_clear()
 
-    with pytest.raises(RuntimeError, match='gas_url'):
-        config.get_settings()
+    with pytest.raises(RuntimeError, match=r'\[stores\.116\]'):
+        config.get_store_settings('116')

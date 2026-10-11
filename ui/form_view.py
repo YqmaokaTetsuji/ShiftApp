@@ -5,6 +5,9 @@ from core.calendar_util import build_day_groups, matches_weekday
 from core.config import (
     DEPARTMENTS,
     SHIFT_CHOICES,
+    STORE_PLACEHOLDER,
+    STORES,
+    STORES_BY_CODE,
     TARGET_HOURS_MAX,
     TARGET_HOURS_MIN,
     WEEKDAYS_JA,
@@ -47,6 +50,22 @@ def bulk_input_dialog(day_labels: list) -> None:
                 st.session_state[time_key(label)] = specific_time
         # 画面を更新してダイアログを閉じる
         st.rerun()
+
+
+def render_store_select(disabled: bool):
+    '''店舗のプルダウン。選ばれた店舗コードを返す（未選択なら None）。
+
+    画面には店舗名だけを出し、状態には店舗コードだけを持つ。
+    保存先の URL やパスワードはサーバ側で店舗コードから引く。
+    '''
+    code = st.selectbox(
+        '店舗を選択',
+        [STORE_PLACEHOLDER] + [store.code for store in STORES],
+        format_func=lambda c: STORES_BY_CODE[c].name if c in STORES_BY_CODE else c,
+        key='input_store',
+        disabled=disabled,
+    )
+    return code if code in STORES_BY_CODE else None
 
 
 def render_basic_info(disabled: bool) -> dict:

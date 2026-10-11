@@ -5,10 +5,10 @@
 import streamlit as st
 
 from core.calendar_util import build_day_labels
-from core.config import get_settings, is_maintenance_time, now_jst, resolve_target_month
+from core.config import STORES_BY_CODE, get_store_settings, is_maintenance_time, now_jst, resolve_target_month
 from services.shift_service import GasError, submit_shift
 from ui import admin_view
-from ui.form_view import build_submission, render_basic_info, render_day_inputs
+from ui.form_view import build_submission, render_basic_info, render_day_inputs, render_store_select
 from ui.preview import styled_calendar
 from ui.state import init_day_inputs, init_session_state, is_input_disabled
 
@@ -22,18 +22,6 @@ footer {visibility: hidden;}
 </style>
 '''
 st.markdown(HIDE_STREAMLIT_STYLE, unsafe_allow_html=True)
-
-# 設定は起動時に検証する。提出ボタンを押した瞬間に初めて発覚すると、
-# 入力し終えた利用者の内容がまるごと無駄になるため。
-try:
-    get_settings()
-except RuntimeError as exc:
-    st.error(
-        '**アプリの設定が読み込めませんでした**\n\n'
-        f'{exc}\n\n'
-        '恐れ入りますが、このまま入力せずに管理者へご連絡ください。'
-    )
-    st.stop()
 
 TARGET_YEAR, TARGET_MONTH = resolve_target_month()
 num_days, day_labels = build_day_labels(TARGET_YEAR, TARGET_MONTH)
@@ -50,8 +38,10 @@ with col_title:
         '時間の希望がある日だけ選択してください。希望がない日は「希望なし」のままでOKです。\n\n'
         'システムの不具合がありましたら、不具合の画面の写真とともに、練馬高野台 箭内にご連絡ください。'
     )
+    # 確認画面以降は店舗を変えられないようにする（送信先がずれないように）
+    store_code = render_store_select(input_disabled)
 with col_admin:
-    admin_view.render(TARGET_MONTH)
+    admin_view.render(TARGET_MONTH, store_code)
 
 st.divider()
 
@@ -63,6 +53,24 @@ if is_maintenance_time(now_jst()):
         '恐れ入りますが、この時間を避けて再度アクセスしてください。'
     )
     st.stop()
+
+if store_code is None:
+    st.info('はじめに、上の「店舗を選択」から勤務している店舗を選んでください。')
+    st.stop()
+
+# 店舗の設定は入力前に検証する。提出ボタンを押した瞬間に初めて発覚すると、
+# 入力し終えた利用者の内容がまるごと無駄になるため。
+try:
+    get_store_settings(store_code)
+except RuntimeError as exc:
+    st.error(
+        '**この店舗の設定が読み込めませんでした**\n\n'
+        f'{exc}\n\n'
+        '恐れ入りますが、このまま入力せずに管理者へご連絡ください。'
+    )
+    st.stop()
+
+store_name = STORES_BY_CODE[store_code].name
 
 # --- 入力エリア ---
 col_left, col_right = st.columns([1, 2])
@@ -96,7 +104,7 @@ def _request_submit() -> None:
     st.session_state.is_processing = True
 
 
-def _do_submit(submission, target_month: int) -> None:
+def _do_submit(submission, target_month: int, store_code: str) -> None:
     '''送信し、その結果を状態に書き込む。
 
     二重送信の判定は is_processing のようなフラグではなく、
@@ -122,7 +130,7 @@ def _do_submit(submission, target_month: int) -> None:
     # 次の実行で同じ内容がもう一度飛ぶことがない。
     st.session_state.sent_request_ids.add(request_id)
     try:
-        submit_shift(submission, target_month)
+        submit_shift(submission, target_month, store_code)
     except GasError:
         # 届かなかったので再試行を許す。もし実は届いていた場合は、
         # 同じ request_id なので GAS 側の重複排除で弾かれる。
@@ -147,7 +155,7 @@ result_area = st.empty()
 
 if st.session_state.is_submitted:
     with result_area.container():
-        st.success(f'{submission.name}さん、シフトの提出が完了しました。')
+        st.success(f'{submission.name}さん、{store_name}へのシフトの提出が完了しました。')
         st.info('※修正が必要な場合は店長または箭内へ連絡してください。')
         st.markdown('#### 提出されたシフト内容')
         st.table(styled_calendar(TARGET_YEAR, TARGET_MONTH, day_labels, shift_requests))
@@ -157,12 +165,12 @@ elif st.session_state.is_processing:
     with result_area.container():
         st.info('送信中です。このままお待ちください（画面を閉じたり更新したりしないでください）。')
         with st.spinner('クラウドにシフトを送信しています...'):
-            _do_submit(submission, TARGET_MONTH)
+            _do_submit(submission, TARGET_MONTH, store_code)
     st.rerun()
 
 elif st.session_state.confirm_mode:
     with result_area.container():
-        st.warning('以下の内容で確定してよろしいですか？')
+        st.warning(f'以下の内容で **{store_name}** に提出します。確定してよろしいですか？')
         st.markdown('#### シフト希望プレビュー')
         st.table(styled_calendar(TARGET_YEAR, TARGET_MONTH, day_labels, shift_requests))
 

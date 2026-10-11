@@ -58,35 +58,64 @@ def excel_sheet_name(target_month: int) -> str:
 
 
 @dataclass(frozen=True)
-class Settings:
-    '''外部から注入される秘匿値'''
+class Store:
+    '''店舗。code は Secrets のキー（[stores.<code>]）にも使う。'''
+    code: str
+    name: str
+
+
+# プルダウンに並べる店舗（この順で表示する）
+STORE_PLACEHOLDER = '選択してください'
+STORES = (
+    Store('116', '池袋東部'),
+    Store('176', '西台'),
+    Store('178', '西友成増'),
+    Store('180', 'イトーヨーカドー赤羽'),
+    Store('206', '板橋前野町'),
+    Store('227', '練馬駅前'),
+    Store('236', 'リヴィンオズ大泉'),
+    Store('246', '練馬高野台駅前'),
+)
+STORES_BY_CODE = {store.code: store for store in STORES}
+
+
+@dataclass(frozen=True)
+class StoreSettings:
+    '''店舗ごとに外部から注入される秘匿値'''
     gas_url: str
     admin_password: str
 
 
-def _read_secret(key: str) -> str:
-    '''環境変数を優先し、無ければ st.secrets を見る。
+def _read_store_secret(store_code: str, key: str) -> str:
+    '''環境変数を優先し、無ければ st.secrets の [stores.<店舗コード>] を見る。
 
-    テストやローカル実行では環境変数だけで動かせるようにするため、
+    テストやローカル実行では環境変数（例: GAS_URL_246）だけで動かせるようにするため、
     streamlit の import はこの関数の中に閉じ込めている。
     '''
-    value = os.environ.get(key.upper())
+    env_key = f'{key.upper()}_{store_code}'
+    value = os.environ.get(env_key)
     if value:
         return value
     try:
         import streamlit as st
 
-        return st.secrets[key]
+        value = st.secrets['stores'][store_code][key]
     except Exception as exc:
         raise RuntimeError(
-            f'設定「{key}」が見つかりません。'
-            f'環境変数 {key.upper()} か .streamlit/secrets.toml を設定してください。'
+            f'店舗 {store_code} の設定「{key}」が見つかりません。'
+            f'このまま入力せずに、練馬高野台 箭内に連絡してください。'
         ) from exc
+    if not value:
+        raise RuntimeError(f'店舗 {store_code} の設定「{key}」が空です。')
+    return value
 
 
-@functools.lru_cache(maxsize=1)
-def get_settings() -> Settings:
-    return Settings(
-        gas_url=_read_secret('gas_url'),
-        admin_password=_read_secret('admin_password'),
+@functools.lru_cache(maxsize=None)
+def get_store_settings(store_code: str) -> StoreSettings:
+    '''店舗の保存先とパスワード。未登録の店舗コードや設定漏れは RuntimeError。'''
+    if store_code not in STORES_BY_CODE:
+        raise RuntimeError(f'店舗コード「{store_code}」は登録されていません。')
+    return StoreSettings(
+        gas_url=_read_store_secret(store_code, 'gas_url'),
+        admin_password=_read_store_secret(store_code, 'admin_password'),
     )

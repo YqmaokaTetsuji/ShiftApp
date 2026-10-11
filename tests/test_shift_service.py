@@ -16,7 +16,11 @@ from services.shift_service import (
 
 def test_submit_shift_sends_payload(monkeypatch):
     sent = {}
-    monkeypatch.setattr(shift_service.gas_client, 'submit', lambda payload: sent.update(payload))
+
+    def fake_submit(url, payload):
+        sent.update(payload, _url=url)
+
+    monkeypatch.setattr(shift_service.gas_client, 'submit', fake_submit)
 
     submission = ShiftSubmission(
         employee_code='1234',
@@ -25,8 +29,9 @@ def test_submit_shift_sends_payload(monkeypatch):
         target_hours=0,
         day_requests={'1日（木）': '休'},
     )
-    submit_shift(submission, target_month=10)
+    submit_shift(submission, target_month=10, store_code='246')
 
+    assert sent['_url'] == 'https://example.test/246/exec'
     assert sent['対象月'] == '10月'
     assert sent['1日（木）'] == '休'
     assert sent['request_id'] == submission.request_id(10)
@@ -35,27 +40,35 @@ def test_submit_shift_sends_payload(monkeypatch):
 def test_submit_shift_sends_same_request_id_for_identical_content(monkeypatch):
     '''連打・リトライで届く同じ内容には同じ ID が付く（GAS 側が2件目を捨てられる）。'''
     sent = []
-    monkeypatch.setattr(shift_service.gas_client, 'submit', lambda payload: sent.append(payload))
+    monkeypatch.setattr(shift_service.gas_client, 'submit', lambda url, payload: sent.append(payload))
 
     submission = ShiftSubmission(
         employee_code='1234', name='山田', department='家電',
         target_hours=0, day_requests={'1日（木）': '休'},
     )
-    submit_shift(submission, target_month=10)
-    submit_shift(submission, target_month=10)
+    submit_shift(submission, target_month=10, store_code='246')
+    submit_shift(submission, target_month=10, store_code='246')
 
     assert sent[0]['request_id'] == sent[1]['request_id']
 
 
 def test_fetch_shifts_returns_empty_frame_when_only_header(monkeypatch):
     monkeypatch.setattr(shift_service.gas_client, 'fetch_rows', lambda *a, **k: [['従業員コード']])
-    assert fetch_shifts(10).empty
+    assert fetch_shifts(10, '246').empty
+
+
+def test_fetch_uses_selected_store_url(monkeypatch):
+    urls = []
+    monkeypatch.setattr(shift_service.gas_client, 'fetch_rows', lambda url, *a, **k: urls.append(url) or [])
+    fetch_shifts(10, '116')
+    fetch_members('227')
+    assert urls == ['https://example.test/116/exec', 'https://example.test/227/exec']
 
 
 def test_fetch_members_strips_column_whitespace(monkeypatch):
     rows = [[' 従業員コード ', ' 名前 '], ['1', '山田']]
     monkeypatch.setattr(shift_service.gas_client, 'fetch_rows', lambda *a, **k: rows)
-    df = fetch_members()
+    df = fetch_members('246')
     assert list(df.columns) == ['従業員コード', '名前']
 
 
