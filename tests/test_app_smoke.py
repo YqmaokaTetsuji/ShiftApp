@@ -86,15 +86,17 @@ def test_filled_form_moves_to_confirm_screen(app):
     assert app.selectbox(key='input_store').disabled
 
 
-def test_missing_settings_stops_the_form_before_input(monkeypatch):
+def test_missing_settings_stops_the_form_before_input(app, monkeypatch):
     '''店舗の設定が読めないときは、入力させる前に止める。'''
     import core.config as config
 
     def raise_missing(store_code):
         raise RuntimeError(f'店舗 {store_code} の設定「gas_url」が見つかりません。')
 
+    # app フィクスチャで昼の時刻に固定しておかないと、メンテナンス時間帯
+    # （＝毎晩 02:00 の自動反映のとき）に先に止まってテストが落ちる
     monkeypatch.setattr(config, 'get_store_settings', raise_missing)
-    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at = app
     at.run()
     _select_store(at, '116')
 
