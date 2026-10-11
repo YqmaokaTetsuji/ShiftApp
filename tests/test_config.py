@@ -72,5 +72,5 @@ def test_get_store_settings_raises_without_secret(monkeypatch):
     monkeypatch.delenv('ADMIN_PASSWORD_116')
     config.get_store_settings.cache_clear()
 
-    with pytest.raises(RuntimeError, match=r'\[stores\.116\]'):
+    with pytest.raises(RuntimeError, match=r'店舗 116 の設定「gas_url」が見つかりません'):
         config.get_store_settings('116')
