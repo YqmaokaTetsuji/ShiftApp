@@ -48,7 +48,7 @@ with col_title:
     st.markdown(f'### {TARGET_YEAR}年{TARGET_MONTH}月分 シフト希望提出フォーム')
     st.write(
         '時間の希望がある日だけ選択してください。希望がない日は「希望なし」のままでOKです。\n\n'
-        'システムの不具合がありましたら、不具合の画面の写真とともに、箭内にご連絡ください。'
+        'システムの不具合がありましたら、不具合の画面の写真とともに、練馬高野台 箭内にご連絡ください。'
     )
 with col_admin:
     admin_view.render(TARGET_MONTH)
