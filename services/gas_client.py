@@ -2,10 +2,9 @@
 
 Streamlit には依存しない。失敗は例外 GasError で表現し、
 画面への出し方は呼び出し側（UI 層）に任せる。
+送信先の URL（店舗ごとに異なる）は呼び出し側から受け取る。
 '''
 import requests
-
-from core.config import get_settings
 
 POST_TIMEOUT_SEC = 10
 GET_TIMEOUT_SEC = 15
@@ -15,11 +14,10 @@ class GasError(Exception):
     '''スプレッドシートとの通信・応答が失敗したことを表す。'''
 
 
-def submit(payload: dict) -> None:
+def submit(gas_url: str, payload: dict) -> None:
     '''提出データを1件送信する。失敗時は GasErrorを返す'''
-    url = get_settings().gas_url
     try:
-        response = requests.post(url, json=payload, timeout=POST_TIMEOUT_SEC)
+        response = requests.post(gas_url, json=payload, timeout=POST_TIMEOUT_SEC)
     except Exception as exc:
         raise GasError('スプレッドシートへの送信に失敗しました。') from exc
 
@@ -35,15 +33,17 @@ def submit(payload: dict) -> None:
         raise GasError('スプレッドシート側で保存に失敗しました。')
 
 
-def fetch_rows(table_type: str, month: int = None) -> list:
-    '''シートの内容を「1行目=見出し」の2次元リストとして取得する。'''
-    url = get_settings().gas_url
+def fetch_rows(gas_url: str, table_type: str, month: str = None) -> list:
+    '''シートの内容を「1行目=見出し」の2次元リストとして取得する。
+
+    month は「2026年01月」のような年月表記。GAS 側で「シフト」を付けてシート名にする。
+    '''
     params = {'type': table_type}
     if month is not None:
         params['month'] = month
 
     try:
-        response = requests.get(url, params=params, timeout=GET_TIMEOUT_SEC)
+        response = requests.get(gas_url, params=params, timeout=GET_TIMEOUT_SEC)
     except Exception as exc:
         raise GasError('データの取得に失敗しました。') from exc
 

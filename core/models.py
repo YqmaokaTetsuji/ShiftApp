@@ -5,7 +5,7 @@ import json
 import unicodedata
 from dataclasses import dataclass, field
 
-from core.config import DEPARTMENT_PLACEHOLDER, JST
+from core.config import DEPARTMENT_PLACEHOLDER, JST, shift_month_label
 
 
 @dataclass(frozen=True)
@@ -40,14 +40,14 @@ class ShiftSubmission:
             errors.append('従業員コードが入力されていません。')
         return errors
 
-    def to_payload(self, target_month: int, submitted_at: datetime.datetime = None) -> dict:
+    def to_payload(self, target_year: int, target_month: int, submitted_at: datetime.datetime = None) -> dict:
         '''GAS へ送る JSON ペイロードを組み立てる。'''
         if submitted_at is None:
             submitted_at = datetime.datetime.now(JST)
 
         clean = self.normalized()
         payload = {
-            '対象月': f'{target_month}月',
+            '対象月': shift_month_label(target_year, target_month),
             '提出日時': submitted_at.strftime('%Y-%m-%d %H:%M:%S'),
             '従業員コード': clean.employee_code,
             '名前': clean.name,
@@ -58,7 +58,7 @@ class ShiftSubmission:
         payload['備考'] = clean.remarks
         return payload
 
-    def request_id(self, target_month: int) -> str:
+    def request_id(self, target_year: int, target_month: int) -> str:
         '''提出内容から決まる一意な ID。内容が同じなら何度計算しても同じ値になる。
 
         GAS 側の重複排除キーとして使う。連打・通信リトライ・リロード後の再提出の
@@ -67,7 +67,7 @@ class ShiftSubmission:
 
         提出日時は押した瞬間によって変わってしまうため、キーの計算から除く。
         '''
-        payload = self.to_payload(target_month)
+        payload = self.to_payload(target_year, target_month)
         payload.pop('提出日時', None)
         blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(blob.encode('utf-8')).hexdigest()

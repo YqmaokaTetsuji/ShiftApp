@@ -39,9 +39,9 @@ def test_validate_collects_all_missing_fields():
 
 def test_to_payload_shape_and_order():
     at = datetime.datetime(2026, 9, 18, 10, 30, 0, tzinfo=JST)
-    payload = _submission().to_payload(target_month=10, submitted_at=at)
+    payload = _submission().to_payload(target_year=2026, target_month=10, submitted_at=at)
 
-    assert payload['対象月'] == '10月'
+    assert payload['対象月'] == '2026年10月'
     assert payload['提出日時'] == '2026-09-18 10:30:00'
     assert payload['従業員コード'] == '1234'
     assert payload['名前'] == '山田 太郎'
@@ -55,7 +55,7 @@ def test_to_payload_shape_and_order():
 
 
 def test_to_payload_normalizes_input():
-    payload = _submission(employee_code='５６７８', name=' 佐藤 ').to_payload(target_month=1)
+    payload = _submission(employee_code='５６７８', name=' 佐藤 ').to_payload(target_year=2027, target_month=1)
     assert payload['従業員コード'] == '5678'
     assert payload['名前'] == '佐藤'
 
@@ -71,12 +71,13 @@ def _id_submission(**overrides):
 
 def test_request_id_ignores_submitted_at():
     '''提出日時は押した瞬間で変わるので、重複判定のキーには影響させない。'''
-    assert _id_submission().request_id(10) == _id_submission().request_id(10)
+    assert _id_submission().request_id(2026, 10) == _id_submission().request_id(2026, 10)
 
 
 def test_request_id_changes_when_content_changes():
     '''内容を直して出し直した場合は別 ID になり、重複扱いで捨てられない。'''
     base = _id_submission()
-    assert base.request_id(10) != _id_submission(day_requests={'1日（木）': '出'}).request_id(10)
-    assert base.request_id(10) != _id_submission(remarks='テスト期間').request_id(10)
-    assert base.request_id(10) != base.request_id(11)
+    assert base.request_id(2026, 10) != _id_submission(day_requests={'1日（木）': '出'}).request_id(2026, 10)
+    assert base.request_id(2026, 10) != _id_submission(remarks='テスト期間').request_id(2026, 10)
+    assert base.request_id(2026, 10) != base.request_id(2026, 11)
+    assert base.request_id(2026, 10) != base.request_id(2027, 10)

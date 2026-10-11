@@ -28,6 +28,7 @@ function doPost(e) {
       return jsonOutput_({"status": "success", "duplicate": true});
     }
 
+    // 対象月は「2026年01月」形式で届くので、シート名は「2026年01月シフト」になる
     var sheetName = data["対象月"] + "シフト";
     var sheet = ss.getSheetByName(sheetName);
 
@@ -126,8 +127,9 @@ function doGet(e) {
   }
   // シフトデータを取得する場合
   else {
+    // month は「2026年01月」形式（提出時の「対象月」と同じ表記）
     var targetMonth = e.parameter.month;
-    var sheetName = targetMonth + "月シフト";
+    var sheetName = targetMonth + "シフト";
     var sheet = ss.getSheetByName(sheetName);
 
     if (!sheet) {

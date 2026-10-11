@@ -3,6 +3,8 @@ import pytest
 from services import gas_client
 from services.gas_client import GasError
 
+URL = 'https://example.test/246/exec'
+
 
 class FakeResponse:
     def __init__(self, status_code=200, payload=None, raise_on_json=False):
@@ -24,9 +26,9 @@ def test_submit_success(monkeypatch):
         return FakeResponse(payload={'status': 'success'})
 
     monkeypatch.setattr(gas_client.requests, 'post', fake_post)
-    gas_client.submit({'名前': '山田'})
+    gas_client.submit(URL, {'名前': '山田'})
 
-    assert captured['url'] == 'https://example.test/exec'
+    assert captured['url'] == URL
     assert captured['json'] == {'名前': '山田'}
     assert captured['timeout'] == gas_client.POST_TIMEOUT_SEC
 
@@ -42,7 +44,7 @@ def test_submit_success(monkeypatch):
 def test_submit_raises_on_bad_response(monkeypatch, response):
     monkeypatch.setattr(gas_client.requests, 'post', lambda *a, **k: response)
     with pytest.raises(GasError):
-        gas_client.submit({})
+        gas_client.submit(URL, {})
 
 
 def test_submit_raises_on_network_error(monkeypatch):
@@ -51,7 +53,7 @@ def test_submit_raises_on_network_error(monkeypatch):
 
     monkeypatch.setattr(gas_client.requests, 'post', boom)
     with pytest.raises(GasError):
-        gas_client.submit({})
+        gas_client.submit(URL, {})
 
 
 def test_fetch_rows_passes_params(monkeypatch):
@@ -62,10 +64,12 @@ def test_fetch_rows_passes_params(monkeypatch):
         return FakeResponse(payload=[['名前'], ['山田']])
 
     monkeypatch.setattr(gas_client.requests, 'get', fake_get)
-    rows = gas_client.fetch_rows('shift', month=10)
+    rows = gas_client.fetch_rows(URL, 'shift', month='2026年10月')
 
     assert rows == [['名前'], ['山田']]
-    assert captured['params'] == {'type': 'shift', 'month': 10}
+    assert captured['url'] == URL
+    assert rows == [['名前'], ['山田']]
+    assert captured['params'] == {'type': 'shift', 'month': '2026年10月'}
     assert captured['timeout'] == gas_client.GET_TIMEOUT_SEC
 
 
@@ -77,11 +81,11 @@ def test_fetch_rows_omits_month_when_none(monkeypatch):
         return FakeResponse(payload=[])
 
     monkeypatch.setattr(gas_client.requests, 'get', fake_get)
-    gas_client.fetch_rows('member')
+    gas_client.fetch_rows(URL, 'member')
     assert captured['params'] == {'type': 'member'}
 
 
 def test_fetch_rows_raises_on_http_error(monkeypatch):
     monkeypatch.setattr(gas_client.requests, 'get', lambda *a, **k: FakeResponse(status_code=404))
     with pytest.raises(GasError):
-        gas_client.fetch_rows('shift', month=10)
+        gas_client.fetch_rows(URL, 'shift', month='2026年10月')

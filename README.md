@@ -59,12 +59,29 @@ tests/                   pytest（ロジック層 + AppTest によるスモー�
 「デプロイを管理」からウェブアプリを新しいバージョンに更新すること
 （ここを忘れると 2 の防御が効かない）。
 
-## シークレット
+## 店舗とシークレット
 
-`gas_url` と `admin_password` の 2 つ。環境変数（`GAS_URL` / `ADMIN_PASSWORD`）を優先し、
-無ければ `st.secrets` を読む。Streamlit Cloud では従来どおり Secrets に設定する。
+店舗ごとにスプレッドシート（＋そこに紐づく GAS ウェブアプリ）を 1 つずつ持つ。
+利用者がプルダウンで店舗を選ぶと、その店舗コードから送信先 URL と店長パスワードを引く。
 
+- 店舗の一覧（コード・表示名・並び順）は `core/config.py` の `STORES`。
+- 店舗ごとの `gas_url` と `admin_password` は Secrets の `[stores.<店舗コード>]`。
+
+```toml
+[stores.246]  # 練馬高野台駅前
+gas_url = "https://script.google.com/macros/s/xxxx/exec"
+admin_password = "...."
+```
+
+環境変数（`GAS_URL_246` / `ADMIN_PASSWORD_246` のように店舗コード付き）を優先し、
+無ければ `st.secrets` を読む。Streamlit Cloud では Secrets に設定する。
 ローカル実行時は環境変数でも `.streamlit/secrets.toml` でもよい。
+
+Secrets が未設定の店舗は、選んだ時点で「設定が読み込めませんでした」と出て入力に進めない。
+店舗の追加・削除は `STORES` の編集が、保存先の差し替えは Secrets の編集だけが必要。
+
+提出データの列に店舗は含めない（保存先が店舗ごとに分かれているため。
+列を足すと、月の途中で既存シートの見出しとずれてしまう）。
 
 ## 実行
 
