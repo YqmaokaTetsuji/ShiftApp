@@ -33,8 +33,11 @@ def submit(gas_url: str, payload: dict) -> None:
         raise GasError('スプレッドシート側で保存に失敗しました。')
 
 
-def fetch_rows(gas_url: str, table_type: str, month: int = None) -> list:
-    '''シートの内容を「1行目=見出し」の2次元リストとして取得する。'''
+def fetch_rows(gas_url: str, table_type: str, month: str = None) -> list:
+    '''シートの内容を「1行目=見出し」の2次元リストとして取得する。
+
+    month は「2026年01月」のような年月表記。GAS 側で「シフト」を付けてシート名にする。
+    '''
     params = {'type': table_type}
     if month is not None:
         params['month'] = month

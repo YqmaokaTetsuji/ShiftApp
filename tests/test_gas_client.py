@@ -64,12 +64,12 @@ def test_fetch_rows_passes_params(monkeypatch):
         return FakeResponse(payload=[['名前'], ['山田']])
 
     monkeypatch.setattr(gas_client.requests, 'get', fake_get)
-    rows = gas_client.fetch_rows(URL, 'shift', month=10)
+    rows = gas_client.fetch_rows(URL, 'shift', month='2026年10月')
 
     assert rows == [['名前'], ['山田']]
     assert captured['url'] == URL
     assert rows == [['名前'], ['山田']]
-    assert captured['params'] == {'type': 'shift', 'month': 10}
+    assert captured['params'] == {'type': 'shift', 'month': '2026年10月'}
     assert captured['timeout'] == gas_client.GET_TIMEOUT_SEC
 
 
@@ -88,4 +88,4 @@ def test_fetch_rows_omits_month_when_none(monkeypatch):
 def test_fetch_rows_raises_on_http_error(monkeypatch):
     monkeypatch.setattr(gas_client.requests, 'get', lambda *a, **k: FakeResponse(status_code=404))
     with pytest.raises(GasError):
-        gas_client.fetch_rows(URL, 'shift', month=10)
+        gas_client.fetch_rows(URL, 'shift', month='2026年10月')

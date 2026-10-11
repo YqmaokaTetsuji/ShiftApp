@@ -41,7 +41,7 @@ with col_title:
     # 確認画面以降は店舗を変えられないようにする（送信先がずれないように）
     store_code = render_store_select(input_disabled)
 with col_admin:
-    admin_view.render(TARGET_MONTH, store_code)
+    admin_view.render(TARGET_YEAR, TARGET_MONTH, store_code)
 
 st.divider()
 
@@ -104,7 +104,7 @@ def _request_submit() -> None:
     st.session_state.is_processing = True
 
 
-def _do_submit(submission, target_month: int, store_code: str) -> None:
+def _do_submit(submission, target_year: int, target_month: int, store_code: str) -> None:
     '''送信し、その結果を状態に書き込む。
 
     二重送信の判定は is_processing のようなフラグではなく、
@@ -116,7 +116,7 @@ def _do_submit(submission, target_month: int, store_code: str) -> None:
     保留中の再実行に切り替わるので、通信と状態更新の間に st.* があると、
     そこで実行が打ち切られて同じ内容がもう一度飛ぶ。
     '''
-    request_id = submission.request_id(target_month)
+    request_id = submission.request_id(target_year, target_month)
 
     # すでにこのセッションで送り終えた内容なら、通信せずに完了として扱う
     if request_id in st.session_state.sent_request_ids:
@@ -130,7 +130,7 @@ def _do_submit(submission, target_month: int, store_code: str) -> None:
     # 次の実行で同じ内容がもう一度飛ぶことがない。
     st.session_state.sent_request_ids.add(request_id)
     try:
-        submit_shift(submission, target_month, store_code)
+        submit_shift(submission, target_year, target_month, store_code)
     except GasError:
         # 届かなかったので再試行を許す。もし実は届いていた場合は、
         # 同じ request_id なので GAS 側の重複排除で弾かれる。
@@ -165,7 +165,7 @@ elif st.session_state.is_processing:
     with result_area.container():
         st.info('送信中です。このままお待ちください（画面を閉じたり更新したりしないでください）。')
         with st.spinner('クラウドにシフトを送信しています...'):
-            _do_submit(submission, TARGET_MONTH, store_code)
+            _do_submit(submission, TARGET_YEAR, TARGET_MONTH, store_code)
     st.rerun()
 
 elif st.session_state.confirm_mode:

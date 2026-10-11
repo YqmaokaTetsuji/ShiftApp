@@ -17,7 +17,7 @@ from services.shift_service import (
 UNSUBMITTED_ROW_STYLE = 'background-color: #FFE6E6'
 
 
-def _render_excel_download(target_month: int, store_code: str) -> None:
+def _render_excel_download(target_year: int, target_month: int, store_code: str) -> None:
     st.markdown('#### シフトデータのダウンロード')
     st.write('スプレッドシートの最新データを、見やすく色付けされたExcelファイルとして保存します。')
 
@@ -26,7 +26,7 @@ def _render_excel_download(target_month: int, store_code: str) -> None:
 
     with st.spinner('クラウドからデータを取得＆Excelを装飾中...'):
         try:
-            df_shifts = fetch_shifts(target_month, store_code)
+            df_shifts = fetch_shifts(target_year, target_month, store_code)
         except GasError as exc:
             st.error(f'通信エラーが発生しました: {exc}')
             return
@@ -36,13 +36,13 @@ def _render_excel_download(target_month: int, store_code: str) -> None:
             return
 
         df_export = build_export_dataframe(df_shifts)
-        excel_data = build_shift_workbook(df_export, excel_sheet_name(target_month))
+        excel_data = build_shift_workbook(df_export, excel_sheet_name(target_year, target_month))
 
     st.success('✅ Excel準備完了！')
     st.download_button(
         label='Excelファイル（.xlsx）を保存',
         data=excel_data,
-        file_name=excel_file_name(target_month),
+        file_name=excel_file_name(target_year, target_month),
         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         use_container_width=True,
         type='primary',
@@ -54,13 +54,13 @@ def _highlight_unsubmitted(row):
     return [style] * len(row)
 
 
-def _render_submission_status(target_month: int, store_code: str) -> None:
+def _render_submission_status(target_year: int, target_month: int, store_code: str) -> None:
     st.markdown('#### 提出状況一覧（未提出チェック）')
 
     with st.spinner('名簿と提出状況を照合中...'):
         try:
             df_members = fetch_members(store_code)
-            df_shifts = fetch_shifts(target_month, store_code)
+            df_shifts = fetch_shifts(target_year, target_month, store_code)
             df_status = build_submission_status(df_members, df_shifts)
         except GasError as exc:
             st.error(f'読み込みエラー: {exc}')
@@ -76,7 +76,7 @@ def _render_submission_status(target_month: int, store_code: str) -> None:
     )
 
 
-def render(target_month: int, store_code: str = None) -> None:
+def render(target_year: int, target_month: int, store_code: str = None) -> None:
     '''店長専用メニュー。パスワードは選択中の店舗のものと照合する。'''
     with st.popover('店長専用メニュー', use_container_width=True):
         if not store_code:
@@ -94,6 +94,6 @@ def render(target_month: int, store_code: str = None) -> None:
             return
 
         st.write('---')
-        _render_excel_download(target_month, store_code)
+        _render_excel_download(target_year, target_month, store_code)
         st.write('---')
-        _render_submission_status(target_month, store_code)
+        _render_submission_status(target_year, target_month, store_code)

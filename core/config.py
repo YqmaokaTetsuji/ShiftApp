@@ -49,12 +49,20 @@ def is_maintenance_time(moment: datetime.datetime = None) -> bool:
     return MAINTENANCE_START_HOUR <= moment.hour < MAINTENANCE_END_HOUR
 
 
-def excel_file_name(target_month: int) -> str:
-    return f'【店長確認用】{target_month}月シフト提出状況.xlsx'
+def shift_month_label(target_year: int, target_month: int) -> str:
+    '''スプレッドシートの「対象月」列とシート名に使う年月表記（例: 2026年01月）。
+
+    GAS 側はこの値に「シフト」を付けたものをシート名にする（例: 2026年01月シフト）。
+    '''
+    return f'{target_year}年{target_month:02d}月'
 
 
-def excel_sheet_name(target_month: int) -> str:
-    return f'{target_month}月シフト提出'
+def excel_file_name(target_year: int, target_month: int) -> str:
+    return f'【店長確認用】{shift_month_label(target_year, target_month)}シフト提出状況.xlsx'
+
+
+def excel_sheet_name(target_year: int, target_month: int) -> str:
+    return f'{shift_month_label(target_year, target_month)}シフト提出'
 
 
 @dataclass(frozen=True)
