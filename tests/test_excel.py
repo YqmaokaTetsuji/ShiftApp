@@ -66,3 +66,13 @@ def test_spacer_row_is_left_unstyled():
 def test_column_widths_have_minimum():
     ws = _load(_frame())
     assert all(dim.width >= 12 for dim in ws.column_dimensions.values())
+
+
+def test_holiday_columns_are_filled_like_sunday():
+    df = pd.DataFrame([{'従業員コード': '1', '名前': 'A', '部門': '家電',
+                        '希望出勤時間': 80, '3日（火）': '出', '4日（水）': '出'}])
+    data = build_shift_workbook(df, 'テスト', holiday_columns={'3日（火）'})
+    ws = load_workbook(io.BytesIO(data))['テスト']
+    # E列 = 3日（火）は祝日、F列 = 4日（水）は平日
+    assert ws['E2'].fill.start_color.rgb.endswith('FFE6E6')
+    assert ws['F2'].fill.fill_type is None

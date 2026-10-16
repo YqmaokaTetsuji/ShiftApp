@@ -3,7 +3,13 @@ import hmac
 
 import streamlit as st
 
-from core.config import excel_file_name, excel_sheet_name, get_store_settings
+from core.calendar_util import build_day_labels, build_holiday_days
+from core.config import (
+    EXPORT_DEPARTMENT_OPTIONS,
+    excel_file_name,
+    excel_sheet_name,
+    get_store_settings,
+)
 from exporters.excel import build_shift_workbook
 from services.shift_service import (
     GasError,
@@ -12,6 +18,7 @@ from services.shift_service import (
     build_submission_status,
     fetch_members,
     fetch_shifts,
+    filter_by_department,
 )
 
 UNSUBMITTED_ROW_STYLE = 'background-color: #FFE6E6'
@@ -20,6 +27,8 @@ UNSUBMITTED_ROW_STYLE = 'background-color: #FFE6E6'
 def _render_excel_download(target_year: int, target_month: int, store_code: str) -> None:
     st.markdown('#### シフトデータのダウンロード')
     st.write('スプレッドシートの最新データを、見やすく色付けされたExcelファイルとして保存します。')
+
+    department = st.selectbox('出力する部門', EXPORT_DEPARTMENT_OPTIONS, key=f'export_dept_{store_code}')
 
     if not st.button('最新のExcelを作成する', use_container_width=True):
         return
@@ -35,14 +44,21 @@ def _render_excel_download(target_year: int, target_month: int, store_code: str)
             st.info('まだ誰もシフトを提出していません。')
             return
 
+        df_shifts = filter_by_department(df_shifts, department)
+        if df_shifts.empty:
+            st.info(f'{department}のシフトはまだ誰も提出していません。')
+            return
+
         df_export = build_export_dataframe(df_shifts)
-        excel_data = build_shift_workbook(df_export, excel_sheet_name(target_year, target_month))
+        _, day_labels = build_day_labels(target_year, target_month)
+        holiday_columns = {day_labels[d - 1] for d in build_holiday_days(target_year, target_month)}
+        excel_data = build_shift_workbook(df_export, excel_sheet_name(target_year, target_month), holiday_columns)
 
     st.success('✅ Excel準備完了！')
     st.download_button(
         label='Excelファイル（.xlsx）を保存',
         data=excel_data,
-        file_name=excel_file_name(target_year, target_month),
+        file_name=excel_file_name(target_year, target_month, department),
         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         use_container_width=True,
         type='primary',

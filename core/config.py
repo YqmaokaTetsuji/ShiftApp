@@ -14,6 +14,10 @@ JST = datetime.timezone(datetime.timedelta(hours=+9), 'JST')
 DEPARTMENT_PLACEHOLDER = '選択してください'
 DEPARTMENTS = [DEPARTMENT_PLACEHOLDER, '季節AV', '家電', '情報', '通信']
 
+# Excel 出力で選べる部門（「全部門」はすべての部門をまとめて出力する）
+ALL_DEPARTMENTS = '全部門'
+EXPORT_DEPARTMENT_OPTIONS = [ALL_DEPARTMENTS] + [d for d in DEPARTMENTS if d != DEPARTMENT_PLACEHOLDER]
+
 # 日ごとの希望として選べる選択肢
 SHIFT_CHOICES = ['希望なし', '休', '早', '遅', '時間指定', '有給']
 
@@ -57,8 +61,10 @@ def shift_month_label(target_year: int, target_month: int) -> str:
     return f'{target_year}年{target_month:02d}月'
 
 
-def excel_file_name(target_year: int, target_month: int) -> str:
-    return f'【店長確認用】{shift_month_label(target_year, target_month)}シフト提出状況.xlsx'
+def excel_file_name(target_year: int, target_month: int, department: str = ALL_DEPARTMENTS) -> str:
+    '''部門を絞った場合は、ファイル名にも部門名を入れて取り違えを防ぐ。'''
+    suffix = '' if department == ALL_DEPARTMENTS else f'_{department}'
+    return f'【店長確認用】{shift_month_label(target_year, target_month)}シフト提出状況{suffix}.xlsx'
 
 
 def excel_sheet_name(target_year: int, target_month: int) -> str:
