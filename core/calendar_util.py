@@ -2,6 +2,8 @@
 import calendar
 import datetime
 
+import jpholiday
+
 from core.config import WEEKDAYS_JA
 
 
@@ -39,3 +41,8 @@ def build_week_matrix(year: int, month: int) -> list:
 def matches_weekday(label: str, weekday_ja: str) -> bool:
     '''日付ラベルが指定の曜日かどうか'''
     return f'（{weekday_ja}）' in label
+
+
+def build_holiday_days(year: int, month: int) -> set:
+    '''対象月の祝日（振替休日などを含む）の日にちの集合を返す。'''
+    return {dt.day for dt, _ in jpholiday.month_holidays(year, month)}

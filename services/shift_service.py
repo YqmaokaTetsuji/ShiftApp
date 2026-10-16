@@ -4,7 +4,13 @@ Streamlit に依存しないので、将来 FastAPI などから呼び出すこ�
 '''
 import pandas as pd
 
-from core.config import DEPARTMENTS, DEPARTMENT_PLACEHOLDER, get_store_settings, shift_month_label
+from core.config import (
+    ALL_DEPARTMENTS,
+    DEPARTMENTS,
+    DEPARTMENT_PLACEHOLDER,
+    get_store_settings,
+    shift_month_label,
+)
 from core.models import ShiftSubmission
 from services import gas_client
 from services.gas_client import GasError  # 呼び出し側の import を1箇所にまとめる
@@ -14,6 +20,7 @@ __all__ = [
     'submit_shift',
     'fetch_shifts',
     'fetch_members',
+    'filter_by_department',
     'build_export_dataframe',
     'build_submission_status',
 ]
@@ -68,6 +75,13 @@ def fetch_members(store_code: str) -> pd.DataFrame:
 def _normalize_codes(series: pd.Series) -> pd.Series:
     '''スプレッドシート由来の「1234.0」のような数値化を文字列コードへ戻す。'''
     return series.astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+
+
+def filter_by_department(df: pd.DataFrame, department: str) -> pd.DataFrame:
+    '''指定した部門の行だけに絞る。「全部門」や部門列が無い場合はそのまま返す。'''
+    if df.empty or department == ALL_DEPARTMENTS or '部門' not in df.columns:
+        return df
+    return df[df['部門'].astype(str).str.strip() == department].reset_index(drop=True)
 
 
 def build_export_dataframe(df: pd.DataFrame) -> pd.DataFrame:

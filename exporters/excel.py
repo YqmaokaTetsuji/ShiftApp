@@ -45,7 +45,7 @@ def _is_day_column(col_name: str) -> bool:
     return '（' in col_name
 
 
-def _style_worksheet(ws) -> None:
+def _style_worksheet(ws, holiday_columns: set) -> None:
     ws.freeze_panes = FREEZE_PANES
 
     header = {
@@ -70,11 +70,11 @@ def _style_worksheet(ws) -> None:
             cell.font = FONT_NORMAL
             cell.alignment = ALIGN_CENTER
 
-            # 土曜と日曜を塗り分ける
-            if '（土）' in col_name:
-                cell.fill = FILL_SATURDAY
-            elif '（日）' in col_name:
+            # 土曜と日曜を塗り分ける（祝日は日曜と同じ色）
+            if '（日）' in col_name or col_name in holiday_columns:
                 cell.fill = FILL_SUNDAY
+            elif '（土）' in col_name:
+                cell.fill = FILL_SATURDAY
 
             # 日付列で「休」「有」なら赤字にする
             if _is_day_column(col_name) and cell.value and is_day_off(cell.value):
@@ -87,10 +87,13 @@ def _style_worksheet(ws) -> None:
         ws.column_dimensions[col_letter].width = max(max_len * COLUMN_WIDTH_FACTOR, MIN_COLUMN_WIDTH)
 
 
-def build_shift_workbook(df: pd.DataFrame, sheet_name: str) -> bytes:
-    '''整形済みの DataFrame から、装飾付き Excel をメモリ上で生成して bytes で返す。'''
+def build_shift_workbook(df: pd.DataFrame, sheet_name: str, holiday_columns: set = frozenset()) -> bytes:
+    '''整形済みの DataFrame から、装飾付き Excel をメモリ上で生成して bytes で返す。
+
+    holiday_columns に含まれる日付列（「3日（火）」など）は祝日として日曜と同じ色で塗る。
+    '''
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name=sheet_name)
-        _style_worksheet(writer.sheets[sheet_name])
+        _style_worksheet(writer.sheets[sheet_name], holiday_columns)
     return output.getvalue()

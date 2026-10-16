@@ -1,6 +1,7 @@
 from core.calendar_util import (
     build_day_groups,
     build_day_labels,
+    build_holiday_days,
     build_week_matrix,
     matches_weekday,
 )
@@ -49,3 +50,17 @@ def test_build_week_matrix_starts_on_sunday():
 def test_matches_weekday():
     assert matches_weekday('3日（土）', '土')
     assert not matches_weekday('3日（土）', '日')
+
+
+def test_build_holiday_days_november_2026():
+    # 文化の日・勤労感謝の日
+    assert build_holiday_days(2026, 11) == {3, 23}
+
+
+def test_build_holiday_days_includes_substitute_holiday():
+    # 2026年5月6日は憲法記念日（日曜）の振替休日
+    assert 6 in build_holiday_days(2026, 5)
+
+
+def test_build_holiday_days_month_without_holiday():
+    assert build_holiday_days(2026, 6) == set()

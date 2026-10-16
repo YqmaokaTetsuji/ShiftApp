@@ -140,3 +140,76 @@ function doGet(e) {
     return jsonOutput_(sheet.getDataRange().getDisplayValues());
   }
 }
+
+// ---- 古い月のシフトシートの自動削除 ----
+// 当月と前月のシートだけ残し、それより前の「YYYY年MM月シフト」を削除する。
+// 例：11月1日に動くと 9月以前のシートが消え、10月・11月（と先の月）は残る。
+// 「名簿」「_提出ID」など、名前が「YYYY年MM月シフト」でないシートには触らない。
+var KEEP_PAST_MONTHS = 1;  // 当月に加えて残す過去の月数
+var CLEANUP_HANDLER = "deleteOldShiftSheets";
+
+function deleteOldShiftSheets() {
+  // 提出の書き込みとすれ違わないよう、doPost と同じロックを取る
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(LOCK_TIMEOUT_MS)) {
+    throw new Error("ロックを取得できなかったため、古いシートの削除を見送りました。");
+  }
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    // スクリプトのタイムゾーン設定に左右されないよう、日本時間で今月を決める
+    var now = Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy-MM").split("-");
+    var oldestKept = Number(now[0]) * 12 + (Number(now[1]) - 1) - KEEP_PAST_MONTHS;
+
+    var deleted = [];
+    ss.getSheets().forEach(function(sheet) {
+      var m = sheet.getName().match(/^(\d{4})年(\d{2})月シフト$/);
+      if (m && Number(m[1]) * 12 + (Number(m[2]) - 1) < oldestKept) {
+        deleted.push(sheet.getName());
+        ss.deleteSheet(sheet);
+      }
+    });
+
+    if (deleted.length > 0) {
+      pruneRequestLog_(ss, deleted);
+    }
+    console.log("削除したシート: " + (deleted.length > 0 ? deleted.join(", ") : "なし"));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// 消したシート宛ての提出 ID も _提出ID から取り除く（記録が際限なく増えないように）
+function pruneRequestLog_(ss, deletedSheetNames) {
+  var sheet = ss.getSheetByName(REQUEST_LOG_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) {
+    return;
+  }
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getDisplayValues();
+  var kept = rows.filter(function(row) {
+    return deletedSheetNames.indexOf(row[2]) === -1;
+  });
+  if (kept.length === rows.length) {
+    return;
+  }
+  sheet.getRange(2, 1, rows.length, 5).clearContent();
+  if (kept.length > 0) {
+    sheet.getRange(2, 1, kept.length, 5).setNumberFormat('@').setValues(kept);
+  }
+}
+
+// 最初に一度だけ、Apps Script エディタからこの関数を選んで実行する。
+// 毎月1日の0時台（スクリプトのタイムゾーン基準）に deleteOldShiftSheets が動くようになる。
+// 何度実行しても、トリガーは1つだけになる。
+function installCleanupTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === CLEANUP_HANDLER) {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+  ScriptApp.newTrigger(CLEANUP_HANDLER)
+    .timeBased()
+    .onMonthDay(1)
+    .atHour(0)
+    .create();
+}

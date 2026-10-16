@@ -229,3 +229,5 @@ def test_admin_menu_uses_selected_store_password(app, password, unlocked):
 
     assert not app.exception
     assert any(b.label == '最新のExcelを作成する' for b in app.button) is unlocked
+    if unlocked:
+        assert app.selectbox(key='export_dept_246').options == ['全部門', '季節AV', '家電', '情報', '通信']

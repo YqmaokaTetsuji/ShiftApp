@@ -74,3 +74,12 @@ def test_get_store_settings_raises_without_secret(monkeypatch):
 
     with pytest.raises(RuntimeError, match=r'店舗 116 の設定「gas_url」が見つかりません'):
         config.get_store_settings('116')
+
+
+def test_export_department_options_start_with_all():
+    assert config.EXPORT_DEPARTMENT_OPTIONS == ['全部門', '季節AV', '家電', '情報', '通信']
+
+
+def test_excel_file_name_includes_department_only_when_filtered():
+    assert config.excel_file_name(2026, 11) == '【店長確認用】2026年11月シフト提出状況.xlsx'
+    assert config.excel_file_name(2026, 11, '家電') == '【店長確認用】2026年11月シフト提出状況_家電.xlsx'

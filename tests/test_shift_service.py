@@ -10,6 +10,7 @@ from services.shift_service import (
     build_submission_status,
     fetch_members,
     fetch_shifts,
+    filter_by_department,
     submit_shift,
 )
 
@@ -105,6 +106,25 @@ def test_build_export_dataframe_handles_unknown_department():
     result = build_export_dataframe(df)
     # 未知の部門は末尾に回る
     assert result['名前'].tolist()[-1] == 'Z'
+
+
+def test_filter_by_department_keeps_only_selected_department():
+    df = filter_by_department(_shift_frame(), '家電')
+    assert df['名前'].tolist() == ['B', 'A']
+
+
+def test_filter_by_department_all_returns_everything():
+    df = filter_by_department(_shift_frame(), '全部門')
+    assert len(df) == 3
+
+
+def test_filter_by_department_returns_empty_when_no_match():
+    assert filter_by_department(_shift_frame(), '通信').empty
+
+
+def test_filtered_export_has_no_spacer_rows():
+    df = build_export_dataframe(filter_by_department(_shift_frame(), '家電'))
+    assert df['名前'].tolist() == ['A', 'B']
 
 
 def test_build_export_dataframe_returns_empty_as_is():
