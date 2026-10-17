@@ -1,7 +1,9 @@
 import datetime
 
 from core.config import JST
-from core.models import ShiftSubmission
+import pytest
+
+from core.models import ShiftSubmission, normalize_employee_code
 
 
 def _submission(**overrides):
@@ -15,6 +17,28 @@ def _submission(**overrides):
     )
     base.update(overrides)
     return ShiftSubmission(**base)
+
+
+@pytest.mark.parametrize(
+    'raw, expected',
+    [
+        ('117543', '117543'),
+        ('015366', '15366'),
+        ('１５３６６', '15366'),
+        ('０１５３６６', '15366'),
+        (' 15366 ', '15366'),
+        ('15366.0', '15366'),
+        (15366, '15366'),
+        ('153　66', '15366'),
+        ('117-543', '117543'),
+        ('117ー543', '117543'),
+        ('ａｂ１２', 'AB12'),
+        ('', ''),
+        (None, ''),
+    ],
+)
+def test_normalize_employee_code(raw, expected):
+    assert normalize_employee_code(raw) == expected
 
 
 def test_normalized_converts_fullwidth_code_and_strips():

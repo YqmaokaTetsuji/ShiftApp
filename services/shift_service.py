@@ -11,7 +11,7 @@ from core.config import (
     get_store_settings,
     shift_month_label,
 )
-from core.models import ShiftSubmission
+from core.models import ShiftSubmission, normalize_employee_code
 from services import gas_client
 from services.gas_client import GasError  # 呼び出し側の import を1箇所にまとめる
 
@@ -73,8 +73,8 @@ def fetch_members(store_code: str) -> pd.DataFrame:
 
 
 def _normalize_codes(series: pd.Series) -> pd.Series:
-    '''スプレッドシート由来の「1234.0」のような数値化を文字列コードへ戻す。'''
-    return series.astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+    '''従業員コード列の表記ゆれ（全角・先頭ゼロ・「1234.0」など）をそろえる。'''
+    return series.map(normalize_employee_code)
 
 
 def filter_by_department(df: pd.DataFrame, department: str) -> pd.DataFrame:
@@ -130,9 +130,9 @@ def build_submission_status(df_members: pd.DataFrame, df_shifts: pd.DataFrame) -
     df_status = df_members[MEMBER_REQUIRED_COLUMNS].copy()
     df_status['従業員コード'] = _normalize_codes(df_status['従業員コード'])
 
-    submitted_codes = []
+    submitted_codes = set()
     if not df_shifts.empty and '従業員コード' in df_shifts.columns:
-        submitted_codes = _normalize_codes(df_shifts['従業員コード']).tolist()
+        submitted_codes = set(_normalize_codes(df_shifts['従業員コード']))
 
     df_status['提出状況'] = df_status['従業員コード'].apply(
         lambda x: STATUS_SUBMITTED if x in submitted_codes else STATUS_PENDING
