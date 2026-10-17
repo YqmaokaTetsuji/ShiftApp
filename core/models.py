@@ -2,10 +2,31 @@
 import datetime
 import hashlib
 import json
+import re
 import unicodedata
 from dataclasses import dataclass, field
 
 from core.config import DEPARTMENT_PLACEHOLDER, JST, shift_month_label
+
+# 従業員コードに紛れ込みやすい区切り文字（空白・ハイフン類・長音・カンマ）
+_CODE_NOISE = re.compile(r'[\s\-‐‑‒–—―−ーｰ,]')
+
+
+def normalize_employee_code(value) -> str:
+    '''従業員コードの表記ゆれをそろえる。
+
+    全角→半角、空白やハイフン類の除去、スプレッドシート由来の「1234.0」、
+    先頭ゼロ（「015366」→「15366」）を吸収する。数字以外を含むコードは
+    半角化・大文字化だけして返す。
+    '''
+    if value is None:
+        return ''
+    code = unicodedata.normalize('NFKC', str(value))
+    code = _CODE_NOISE.sub('', code)
+    code = re.sub(r'\.0+$', '', code)
+    if code.isdecimal():
+        return str(int(code))
+    return code.upper()
 
 
 @dataclass(frozen=True)
@@ -19,9 +40,9 @@ class ShiftSubmission:
     remarks: str = ''
 
     def normalized(self) -> 'ShiftSubmission':
-        '''全角数字などを正規化し、前後の空白を落とした提出データを返す。'''
+        '''従業員コードの表記ゆれをそろえ、前後の空白を落とした提出データを返す。'''
         return ShiftSubmission(
-            employee_code=unicodedata.normalize('NFKC', self.employee_code).strip(),
+            employee_code=normalize_employee_code(self.employee_code),
             name=self.name.strip(),
             department=self.department,
             target_hours=self.target_hours,

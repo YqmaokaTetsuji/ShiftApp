@@ -157,6 +157,19 @@ def test_build_submission_status_marks_submitted_and_pending():
     assert status['提出状況'].iloc[0] == STATUS_PENDING
 
 
+def test_build_submission_status_absorbs_code_variants():
+    members = pd.DataFrame(
+        [
+            {'従業員コード': '15366', '名前': 'A', '部門': '家電'},
+            {'従業員コード': '117543', '名前': 'B', '部門': '家電'},
+            {'従業員コード': '015366', '名前': 'C', '部門': '季節AV'},
+        ]
+    )
+    shifts = pd.DataFrame([{'従業員コード': '０１５３６６'}, {'従業員コード': '１１７５４３'}])
+    status = build_submission_status(members, shifts)
+    assert set(status['提出状況']) == {STATUS_SUBMITTED}
+
+
 def test_build_submission_status_all_pending_when_no_shifts():
     status = build_submission_status(_member_frame(), pd.DataFrame())
     assert set(status['提出状況']) == {STATUS_PENDING}
