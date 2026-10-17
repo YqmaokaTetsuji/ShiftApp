@@ -6,7 +6,9 @@ Streamlit には依存しない。失敗は例外 GasError で表現し、
 '''
 import requests
 
-POST_TIMEOUT_SEC = 10
+# GAS はロック待ちに最大 20 秒（Code.gs の LOCK_TIMEOUT_MS）＋書き込みに数秒かかる。
+# それより短いと、混雑時に「こちらはエラー表示、GAS 側は保存済み」がおきるため長めにとる。
+POST_TIMEOUT_SEC = 30
 GET_TIMEOUT_SEC = 15
 
 
